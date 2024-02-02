@@ -1,7 +1,7 @@
 {
-  "name": "seatbooking",
+  "name": "unicarta",
   "version": "1.0.0",
-  "description": "seatbooking Backend",
+  "description": "unicarta Backend",
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
