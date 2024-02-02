@@ -3,4 +3,5 @@ module.exports = (app) => {
   app.get('/allproduct',ecommerce.fetchData)
   app.post('/checkout',ecommerce.checkOut);
   app.post('/validateCoupon',ecommerce.validateCoupon)
+  app.post('/userDetails',ecommerce.checkoutDetails)
 }
