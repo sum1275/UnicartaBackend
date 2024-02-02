@@ -80,32 +80,7 @@ const checkOut = async (req, res) => {
   }
 };
 
-// const validateCoupon = async (req, res) => {
-//   try {
-//     console.log('Request body:');
-//     console.log(req.body.couponCode)
-//     const couponCode = req.body.couponCode;
-//     const usersFileContent = fs.readFileSync(usersFilePath, 'utf8');
-//     const userData = JSON.parse(usersFileContent);
 
-//     if (couponCode === "") {
-//       return res.status(200).json({ valid: false, message: 'Coupon is not valid' });
-//     }
-
-//     if (userData) {
-//       const userWithValidCoupon = userData.find(user => user.coupon_codes.some(coupon => coupon.code === couponCode && !coupon.status));
-//       if (userWithValidCoupon) {
-//         return res.status(200).json({ valid: true, message: 'Coupon is valid' });
-//       } else {
-//         return res.status(200).json({ valid: false, message: 'Coupon is not valid' });
-//       }
-//     } else {
-//       return res.status(404).json({ error: 'User data not found' });
-//     }
-//   } catch (error) {
-//     return res.status(500).json({ message: 'Error validating coupon', error: error.message });
-//   }
-// };
 
 const validateCoupon = async (req, res) => {
   try {
