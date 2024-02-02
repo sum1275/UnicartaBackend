@@ -33,7 +33,8 @@ const generateCouponCode = (email, carts) => {
 };
 
 const checkOut = async (req, res) => {
-  const { email, cartdata } = req.body;
+  console.log(req.body);
+  const { email, cartdata, priceT, coupan } = req.body;
 
   try {
     let usersData = [];
@@ -48,25 +49,33 @@ const checkOut = async (req, res) => {
     let userIndex = usersData.findIndex((user) => user._id === email);
 
     if (userIndex !== -1) {
-      // User exists
       if (!usersData[userIndex].cart) {
-        // Initialize cart as an empty array if it doesn't exist
         usersData[userIndex].cart = [];
       }
 
-      // Push current cartdata to existing carts
       usersData[userIndex].cart.push(cartdata);
 
-      // Flatten all carts for this user including current cartdata
       let allCarts = usersData[userIndex].cart;
 
-      // Generate coupon code if needed
       let newCouponCode = await generateCouponCode(email, allCarts);
 
-      usersData[userIndex].coupon_codes.push(newCouponCode);
+      if (!usersData[userIndex].coupon_codes) {
+        usersData[userIndex].coupon_codes = [];
+      }
+
+      // Check if provided coupon matches any in the array
+      for (let i = 0; i < usersData[userIndex].coupon_codes.length; i++) {
+        if (usersData[userIndex].coupon_codes[i] && usersData[userIndex].coupon_codes[i].code === coupan) {
+          // Update the status of matched coupon to true
+          usersData[userIndex].coupon_codes[i].status = true;
+        }
+      }
+
+      // Update or add priceT and coupan to userData
+      usersData[userIndex].priceT = priceT;
+      usersData[userIndex].coupan = coupan;
     } else {
-      // New user, create new userData object with initialized cart
-      const userData = { _id: email, cart: [cartdata], coupon_codes: [] };
+      const userData = { _id: email, cart: [cartdata], coupon_codes: [], priceT, coupan };
       usersData.push(userData);
     }
 
@@ -74,11 +83,11 @@ const checkOut = async (req, res) => {
 
     res.status(200).json({ message: "Checkout successful" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error during checkout", error: error.message });
+    res.status(500).json({ message: "Error during checkout", error: error.message });
   }
 };
+
+
 
 
 
@@ -88,9 +97,7 @@ const validateCoupon = async (req, res) => {
     const couponCode = req.body.couponCode;
 
     if (!couponCode || couponCode.trim() === "") {
-      return res
-        .status(200)
-        .json({ valid: false, message: "Coupon is not valid" });
+      return res.status(200).json({ valid: false, message: "Coupon is not valid" });
     }
 
     const usersFileContent = fs.readFileSync(usersFilePath, "utf8");
@@ -99,36 +106,32 @@ const validateCoupon = async (req, res) => {
       userData = JSON.parse(usersFileContent);
     } catch (parseError) {
       console.error("Error parsing user data:", parseError);
-      return res
-        .status(500)
-        .json({
-          message: "Error parsing user data",
-          error: parseError.message,
-        });
+      return res.status(500).json({ message: "Error parsing user data", error: parseError.message });
     }
 
-    const userWithValidCoupon = userData.find(
-      (user) =>
-        user.coupon_codes.length > 1 &&
-        user.coupon_codes.some(
-          (coupon) => coupon?.code === couponCode && !coupon?.status
-        )
+    const userWithValidCoupon = userData.find((user) =>
+      user.coupon_codes &&
+      user.coupon_codes.some((coupon) =>
+        coupon &&
+        coupon.code === couponCode &&
+        (coupon.status === false || !coupon.status)
+      )
     );
 
     if (userWithValidCoupon) {
       return res.status(200).json({ valid: true, message: "Coupon is valid" });
     } else {
-      return res
-        .status(200)
-        .json({ valid: false, message: "Coupon is not valid" });
+      return res.status(200).json({ valid: false, message: "Coupon is not valid" });
     }
   } catch (error) {
     console.error("Error in validateCoupon function:", error);
-    return res
-      .status(500)
-      .json({ message: "Error validating coupon", error: error.message });
+    return res.status(500).json({ message: "Error validating coupon", error: error.message });
   }
 };
+
+
+
+
 
 const fetchData = async (req, res) => {
   try {
@@ -141,4 +144,56 @@ const fetchData = async (req, res) => {
   }
 };
 
-module.exports = { fetchData, checkOut, validateCoupon };
+
+const checkoutDetails = async (req, res) => {
+  const userEmail = req.body.email; // Assuming the email is sent in the request body
+
+  try {
+    let usersData = [];
+
+    if (fs.existsSync(usersFilePath)) {
+      const usersFileContent = fs.readFileSync(usersFilePath, "utf8");
+      if (usersFileContent.trim() !== "") {
+        usersData = JSON.parse(usersFileContent);
+      }
+    }
+
+    const user = usersData.find((userData) => userData._id === userEmail);
+
+    if (user) {
+      const calculateTotalPurchaseAmount = (cart) => {
+        let totalAmount = 0;
+        cart.forEach((item) => {
+          totalAmount += item.price * item.qty;
+        });
+        return totalAmount;
+      };
+
+      const calculateTotalDiscountAmount = (coupons) => {
+        let totalDiscount = 0;
+        coupons.forEach((coupon) => {
+          if (coupon && coupon.status === true) {
+            totalDiscount += 10; // Assuming a fixed discount amount of $10 for each valid coupon
+          }
+        });
+        return totalDiscount;
+      };
+
+      const userDetails = {
+        _id: user._id,
+        itemsPurchased: user.cart.flat().length,
+        totalPurchaseAmount: calculateTotalPurchaseAmount(user.cart.flat()),
+        discountCodes: user.coupon_codes.filter((coupon) => coupon && coupon.status === true).map((coupon) => coupon.code),
+        totalDiscountAmount: calculateTotalDiscountAmount(user.coupon_codes)
+      };
+
+      res.status(200).json(userDetails);
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching checkout details", error: error.message });
+  }
+};
+
+module.exports = { fetchData, checkOut, validateCoupon,checkoutDetails };
